@@ -38,7 +38,7 @@ def pil_to_numpy(im: PILImage) -> np.ndarray:
 
     # Unpack data
     e = Image._getencoder(im.mode, "raw", im.mode)
-    e.setimage(im.im)
+    e.setimage(im.im, (0, 0) + im.size)
 
     # NumPy buffer for the result
     shape, typestr = Image._conv_type_shape(im)
