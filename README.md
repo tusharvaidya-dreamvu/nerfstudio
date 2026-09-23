@@ -48,6 +48,75 @@
 - [Learn more](#learn-more)
 - [Supported Features](#supported-features)
 
+---
+
+## DreamVu fork — pipeline & commands
+
+> This section is DreamVu-specific and lives only in this fork. Everything
+> from "# About" onward is unmodified upstream content — safe to diff/merge
+> against `nerfstudio-project/nerfstudio` as usual.
+
+This fork carries two environment-compatibility fixes beyond upstream:
+`pil_to_numpy`'s Pillow `setimage()` call updated for newer Pillow versions,
+and explicit `weights_only=False` on checkpoint loads (newer PyTorch
+defaults `torch.load` to `weights_only=True`, which breaks loading
+nerfstudio's pickled checkpoint state).
+
+Used alongside two sibling repos:
+
+| Repo | Role |
+|---|---|
+| [`gsplat`](https://github.com/tusharvaidya-dreamvu/gsplat) | Core rasterizer this repo's `splatfacto` method trains through; also has its own native-fisheye trainer path (`examples/simple_trainer.py`) used directly for some pipelines instead of going through `ns-train` |
+| **nerfstudio** (this repo) | COLMAP/hloc dataparser + `ns-train splatfacto` — the integration path used for the Alia rig's multi-camera pipeline |
+| [`alia16k-capture2`](https://github.com/tusharvaidya-dreamvu/alia16k-capture2) | The actual capture data, COLMAP rig configs, IMU fusion, and splat-physics demos built on top of both of the above |
+
+### Process data — COLMAP (default) or hloc
+
+```bash
+# default: COLMAP + SIFT features
+ns-process-data images --data <images_dir> --output-dir <out_dir> \
+  --camera-type fisheye
+
+# hloc instead: modern learned features/matchers (superpoint, superglue,
+# disk+lightglue, etc.) in place of SIFT -- generally more robust on
+# difficult imagery (low texture, wide baselines), slower and needs the
+# separate hloc toolbox installed (https://github.com/cvg/Hierarchical-Localization)
+ns-process-data images --data <images_dir> --output-dir <out_dir> \
+  --sfm-tool hloc --feature-type superpoint_aachen --matcher-type superglue
+```
+
+`--sfm-tool any` (the default) lets nerfstudio pick automatically; pin it
+explicitly (`colmap` or `hloc`) once you know which one a given dataset
+needs. `--matching-method sequential` is worth adding for a walkthrough
+video/rig capture specifically (vs. the default `vocab_tree`) — sequential
+is faster and matches nerfstudio's own recommendation for video-like
+capture order.
+
+### Train
+
+```bash
+ns-train splatfacto \
+  --data <processed_dir> \
+  colmap --masks-path <processed_dir>/masks
+# --masks-path only works via the colmap-based dataparser subcommand shown
+# above; needed whenever dynamic objects (e.g. rig housing, a person) were
+# masked out at the COLMAP feature-extraction stage too -- masking only one
+# of the two stages leaves the other still training on/matching those pixels.
+```
+
+### Evaluate
+
+```bash
+ns-eval --load-config <processed_dir>/outputs/.../config.yml \
+  --output-path eval_metrics.json
+```
+
+Full narrative (why the fisheye path needs pre-undistortion, the specific
+masking pitfalls hit, results) is in the DreamVu wiki's EXP-005 writeup —
+this section is the command reference, that page is the reasoning.
+
+---
+
 # About
 
 _It’s as simple as plug and play with nerfstudio!_
